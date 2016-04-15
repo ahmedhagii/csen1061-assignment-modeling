@@ -1,0 +1,122 @@
+---
+title: "modelling-assignment"
+author: "ahmed-akram"
+date: "April 14, 2016"
+output: html_document
+---
+
+
+```{r, message=FALSE}
+library(dplyr)
+library(plyr)
+
+```
+
+
+Let's start by loading the data
+```{r, warning=FALSE}
+sonar_data = read.csv("data/sonar.all-data")
+```
+
+now we do the initial experiment where we train and test a decision tree on the same data set.
+
+```{r, warning=FALSE}
+library(RWeka)
+fit <- J48(R~., data=sonar_data)
+summary(fit)
+pred <- predict(fit, sonar_data[,1:60])
+table(pred, sonar_data$R)
+```
+
+To build the confusion matrix let's assume that our question was `is it a rock?` then the result is:
+
+                    Actual NO   Actual YES
+    Predicted NO    TN = 110    FN = 3  
+    Predicted YES   FP = 1      TP = 93 
+
+Accuracy (how often is the classifier correct) = TP + TN / total = 203/207 = 98.1%
+
+Precision (when it predicts yes, how often is it correct) = TP / predicted yes = 93 / 94 = 98.9%
+
+Recall (when it's actually yes, how often does it predict yes) = TP / actual yes = 93 / 96 = 96.9%
+
+F-score (the weighted average of precision and recall, 1 being the best and 0 the worst) = 2 * (Precision * Recall) / (Precision + Recall) = 2 * (0.981 * 0.989) / (0.981 + 0.989) = 0.985
+
+as we can see when training and testing on the same data set, the decision tree gives us astonishing results, because it accounts for all the possibilities in the dataset and branches accordingly.
+
+
+## k-fold cross validation
+
+```{r}
+cross_validate <- function(data, model, class) {
+  # folds
+  k = 10
+  
+  # give each row an id from 1:k representing which fold it's in
+  data$id <- sample(1:k, nrow(data), replace = TRUE)
+  list <- 1:k
+  
+  progress.bar <- create_progress_bar("text")
+  progress.bar$init(k)
+  
+  accuracies = c()
+  precisions = c()
+  recalls = c()
+  f_scores = c()
+  
+  for (i in 1:k){
+    # get all rows with id != i to be in training set and those with id == i will be testing set
+    trainingset <- data %>% subset(id %in% list[-i])
+    testset <- data %>% subset(id %in% c(i))
+    
+    # building the formula
+    frm <- paste(class, ".", sep="~")
+    # building the fitting model  
+    fit <- frm %>% formula %>% model(data=sonar_data)
+    
+    # run a random forest model
+    # mymodel <- randomForest(trainingset$Sepal.Length ~ ., data = trainingset, ntree = 100)
+                                                     
+    # get the index of the class in the list of feature names
+    index <- which(data %>% names == class)
+    # remove that column from the test data
+    #temp <- as.data.frame(predict(mymodel, testset[,-1]))
+    # append this iteration's predictions to the end of the prediction data frame
+    #prediction <- rbind(prediction, temp)
+    
+    pred <- predict(fit, testset[,-index])
+    confusion_matrix <- table(pred, testset[[class]])
+    
+    TN <- confusion_matrix[1,1]
+    TP <- confusion_matrix[2,2]
+    FP <- confusion_matrix[2,1]
+    FN <- confusion_matrix[1,2]
+    
+    accuracy <- (TP + TN) / (testset %>% nrow)
+    precision <- (TP) / (FP + TP)
+    recall <- (TP) / (TP + FN)
+    f_score <- 2 * (recall * precision) / (recall + precision)
+    
+    accuracies <- accuracies %>% append(accuracy)
+    precisions <- precisions %>% append(precision)
+    recalls <- recalls %>% append(recall)
+    f_scores <- f_scores %>% append(f_score)
+    # append this iteration's test set to the test set copy data frame
+    # keep only the Sepal Length Column
+    #testsetCopy <- rbind(testsetCopy, as.data.frame(testset[,1]))
+    
+    progress.bar$step()
+  }
+  
+  return (as.data.frame(list("Accuracy" = accuracies, 
+                            "Precision" = precisions,
+                            "Recall" = recalls,
+                            "F_Score" = f_scores)))
+}
+
+res <- cross_validate(sonar_data, J48, "R")
+```
+
+                   Actual NO   Actual YES
+    Predicted NO    TN = 110    FN = 3  
+    Predicted YES   FP = 1      TP = 93 
