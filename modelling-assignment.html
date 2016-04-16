@@ -158,9 +158,8 @@ pred   M   R
    M 110   3
    R   1  93</code></pre>
 <p>To build the confusion matrix let’s assume that our question was <code>is it a rock?</code> then the result is:</p>
-<pre><code>                Actual NO   Actual YES
-Predicted NO    TN = 110    FN = 3  
-Predicted YES   FP = 1      TP = 93 </code></pre>
+<p>Actual NO Actual YES Predicted NO TN = 110 FN = 3<br />
+Predicted YES FP = 1 TP = 93</p>
 <p>Accuracy (how often is the classifier correct) = TP + TN / total = 203/207 = 98.1%</p>
 <p>Precision (when it predicts yes, how often is it correct) = TP / predicted yes = 93 / 94 = 98.9%</p>
 <p>Recall (when it’s actually yes, how often does it predict yes) = TP / actual yes = 93 / 96 = 96.9%</p>
@@ -170,74 +169,74 @@ Predicted YES   FP = 1      TP = 93 </code></pre>
 <h2>k-fold cross validation</h2>
 <p>This function takes the data and the desired model and applies the k-fold cross validation and returns the result as a data frame for each metric and that metric value in each one of the k-folds.</p>
 <pre class="r"><code>cross_validate &lt;- function(data, model, class, folds, ntree = NULL, print=FALSE, type=NULL) {
-  # folds
-  k = folds
-  
-  # give each row an id from 1:k representing which fold it's in
-  data$id &lt;- sample(1:k, nrow(data), replace = TRUE)
-  list &lt;- 1:k
-  
-  data[[class]] &lt;- factor(data[[class]])
-  #progress.bar &lt;- create_progress_bar(&quot;text&quot;)
-  #progress.bar$init(k)
-  
-  accuracies = c()
-  precisions = c()
-  recalls = c()
-  f_scores = c()
-  
-  for (i in 1:k){
-    # get all rows with id != i to be in training set and those with id == i will be testing set
-    trainingset &lt;- data %&gt;% subset(id %in% list[-i])
-    testset &lt;- data %&gt;% subset(id %in% c(i))
-    # building the formula
-    frm &lt;- paste(class, &quot;.&quot;, sep=&quot; ~ &quot;)
+    # folds
+    k = folds
     
-    # building the fitting model
-    if(is.null(ntree)) {
-      fit &lt;- frm %&gt;% formula %&gt;% model(data=data)
-    }else if(!is.null(type)) {
-      fit &lt;- frm %&gt;% formula %&gt;% model(data=data, type=type)
-    }else{
-      fit &lt;- frm %&gt;% formula %&gt;% model(data=data, ntree = ntree)
+    # give each row an id from 1:k representing which fold it's in
+    data$id &lt;- sample(1:k, nrow(data), replace = TRUE)
+    list &lt;- 1:k
+    
+    data[[class]] &lt;- factor(data[[class]])
+    #progress.bar &lt;- create_progress_bar(&quot;text&quot;)
+    #progress.bar$init(k)
+    
+    accuracies = c()
+    precisions = c()
+    recalls = c()
+    f_scores = c()
+    
+    for (i in 1:k){
+        # get all rows with id != i to be in training set and those with id == i will be testing set
+        trainingset &lt;- data %&gt;% subset(id %in% list[-i])
+        testset &lt;- data %&gt;% subset(id %in% c(i))
+        # building the formula
+        frm &lt;- paste(class, &quot;.&quot;, sep=&quot; ~ &quot;)
+        
+        # building the fitting model
+        if(is.null(ntree)) {
+            fit &lt;- frm %&gt;% formula %&gt;% model(data=data)
+        }else if(!is.null(type)) {
+            fit &lt;- frm %&gt;% formula %&gt;% model(data=data, type=type)
+        }else{
+            fit &lt;- frm %&gt;% formula %&gt;% model(data=data, ntree = ntree)
+        }
+        
+        # get the index of the class in the list of feature names
+        index &lt;- which(data %&gt;% names == class)
+        
+        # predict on the test set without the desired class column
+        pred &lt;- predict(fit, testset[,-index])
+        
+        confusion_matrix &lt;- table(pred, testset[[class]])
+        #rownames(confusion_matrix) &lt;- c(&quot;Predicted No&quot;, &quot;Predicted Yes&quot;)
+        #colnames(confusion_matrix) &lt;- c(&quot;Actual No&quot;, &quot;Actual Yes&quot;)
+        
+        if(print) {
+            print(confusion_matrix)
+        }
+        
+        TN &lt;- confusion_matrix[1,1]
+        TP &lt;- confusion_matrix[2,2]
+        FP &lt;- confusion_matrix[2,1]
+        FN &lt;- confusion_matrix[1,2]
+        
+        accuracy &lt;- (TP + TN) / (testset %&gt;% nrow)
+        precision &lt;- (TP) / (FP + TP)
+        recall &lt;- (TP) / (TP + FN)
+        f_score &lt;- 2 * (recall * precision) / (recall + precision)
+        
+        accuracies &lt;- accuracies %&gt;% append(accuracy)
+        precisions &lt;- precisions %&gt;% append(precision)
+        recalls &lt;- recalls %&gt;% append(recall)
+        f_scores &lt;- f_scores %&gt;% append(f_score)
+        
+        #progress.bar$step()
     }
     
-    # get the index of the class in the list of feature names
-    index &lt;- which(data %&gt;% names == class)
-
-    # predict on the test set without the desired class column
-    pred &lt;- predict(fit, testset[,-index])
-    
-    confusion_matrix &lt;- table(pred, testset[[class]])
-    #rownames(confusion_matrix) &lt;- c(&quot;Predicted No&quot;, &quot;Predicted Yes&quot;)
-    #colnames(confusion_matrix) &lt;- c(&quot;Actual No&quot;, &quot;Actual Yes&quot;)
-    
-    if(print) {
-      print(confusion_matrix)
-    }
-    
-    TN &lt;- confusion_matrix[1,1]
-    TP &lt;- confusion_matrix[2,2]
-    FP &lt;- confusion_matrix[2,1]
-    FN &lt;- confusion_matrix[1,2]
-    
-    accuracy &lt;- (TP + TN) / (testset %&gt;% nrow)
-    precision &lt;- (TP) / (FP + TP)
-    recall &lt;- (TP) / (TP + FN)
-    f_score &lt;- 2 * (recall * precision) / (recall + precision)
-    
-    accuracies &lt;- accuracies %&gt;% append(accuracy)
-    precisions &lt;- precisions %&gt;% append(precision)
-    recalls &lt;- recalls %&gt;% append(recall)
-    f_scores &lt;- f_scores %&gt;% append(f_score)
-   
-    #progress.bar$step()
-  }
-  
-  return (as.data.frame(list(&quot;Accuracy&quot; = accuracies, 
-                            &quot;Precision&quot; = precisions,
-                            &quot;Recall&quot; = recalls,
-                            &quot;F_Score&quot; = f_scores)))
+    return (as.data.frame(list(&quot;Accuracy&quot; = accuracies, 
+                               &quot;Precision&quot; = precisions,
+                               &quot;Recall&quot; = recalls,
+                               &quot;F_Score&quot; = f_scores)))
 }</code></pre>
 <p>Now let’s run the 10-fold cross-validation on different algorithms and see the results</p>
 <div id="c4.5-decision-tree" class="section level3">
@@ -294,10 +293,10 @@ Predicted YES   FP = 1      TP = 93 </code></pre>
 <p>First, we’re gonna normalize the data, because not doing so (depending on the dataset) may lead to incorrect results or the training process taking time. I’ll scale using the min-max scale and scale the data in the interval [0,1]. Moreover, I’ll map ‘R’ into 1 and ‘M’ into 0 to keep everything numerical.</p>
 <pre class="r"><code>sonar_data_mapped &lt;- sonar_data
 sonar_data_mapped$R &lt;- sonar_data %&gt;% apply(1, function(x) {
-  if(x['R'] == 'R') {
-    return (1)
-  }
-  return (0)
+    if(x['R'] == 'R') {
+        return (1)
+    }
+    return (0)
 })
 maxs &lt;- apply(sonar_data_mapped, 2, max) 
 mins &lt;- apply(sonar_data_mapped, 2, min)
@@ -326,20 +325,20 @@ summary(res)[4,]</code></pre>
 <h2>Testing on other data sets:</h2>
 <p>This function will perform each 10-fold, 10 times and return the results.</p>
 <pre class="r"><code>do_it_10_times &lt;- function(fn, ...) {
-  acc = c()
-  prec = c()
-  rec = c()
-  f_scr = c()
-  
-  for(i in 1:3) {
-    res &lt;- fn(...)
-    acc &lt;- acc %&gt;% append(res$Accuracy %&gt;% mean)
-    prec &lt;- prec %&gt;% append(res$Precision %&gt;% mean)
-    rec &lt;- rec %&gt;% append(res$Recall %&gt;% mean)
-    f_scr &lt;- f_scr %&gt;% append(res$F_Score %&gt;% mean)
-  }
-  list &lt;- c(acc %&gt;% mean, prec %&gt;% mean, rec %&gt;% mean, f_scr %&gt;% mean)
-  return (list)
+    acc = c()
+    prec = c()
+    rec = c()
+    f_scr = c()
+    
+    for(i in 1:3) {
+        res &lt;- fn(...)
+        acc &lt;- acc %&gt;% append(res$Accuracy %&gt;% mean)
+        prec &lt;- prec %&gt;% append(res$Precision %&gt;% mean)
+        rec &lt;- rec %&gt;% append(res$Recall %&gt;% mean)
+        f_scr &lt;- f_scr %&gt;% append(res$F_Score %&gt;% mean)
+    }
+    list &lt;- c(acc %&gt;% mean, prec %&gt;% mean, rec %&gt;% mean, f_scr %&gt;% mean)
+    return (list)
 }</code></pre>
 <hr />
 <div id="hepatitis-data" class="section level3">
@@ -427,67 +426,174 @@ print('bagging')</code></pre>
 spec_data_matrix &lt;- spec_data_matrix[,-1]
 colnames(spec_data_matrix) &lt;- c(&quot;J48&quot;, &quot;randomForest&quot;, &quot;svm&quot;, &quot;naiveBayes&quot;)</code></pre>
 </div>
+<div id="sonar-data" class="section level3">
+<h3>Sonar Data</h3>
+<pre class="r"><code>sonar_data &lt;- read.csv(&quot;data/SPECT.test&quot;, header=F)
+colnames(sonar_data) = c(&quot;class&quot;, &quot;F1&quot;, &quot;F2&quot;, &quot;F3&quot;, &quot;F4&quot;, &quot;F5&quot;, &quot;F6&quot;, &quot;F7&quot;, &quot;F8&quot;, &quot;F9&quot;, &quot;F10&quot;, &quot;F11&quot;, &quot;F12&quot;, &quot;F13&quot;, &quot;F14&quot;, &quot;F15&quot;, &quot;F16&quot;, &quot;F17&quot;, &quot;F18&quot;, &quot;F19&quot;, &quot;F20&quot;, &quot;F21&quot;, &quot;F22&quot;)
+sonar_data2 &lt;- read.csv(&quot;data/SPECT.train&quot;, header=F)
+colnames(sonar_data2) = c(&quot;class&quot;, &quot;F1&quot;, &quot;F2&quot;, &quot;F3&quot;, &quot;F4&quot;, &quot;F5&quot;, &quot;F6&quot;, &quot;F7&quot;, &quot;F8&quot;, &quot;F9&quot;, &quot;F10&quot;, &quot;F11&quot;, &quot;F12&quot;, &quot;F13&quot;, &quot;F14&quot;, &quot;F15&quot;, &quot;F16&quot;, &quot;F17&quot;, &quot;F18&quot;, &quot;F19&quot;, &quot;F20&quot;, &quot;F21&quot;, &quot;F22&quot;)
+sonar_data &lt;- rbind(sonar_data, sonar_data2) 
+sonar_data &lt;- sonar_data[sample(nrow(sonar_data)), ]</code></pre>
+<pre class="r"><code>sonar_data_matrix &lt;- data.frame(1:4)
+rownames(sonar_data_matrix) &lt;- c(&quot;Accuracy&quot;, &quot;Precision&quot;, &quot;Recall&quot;, &quot;F_Score&quot;)
+
+print('j48')</code></pre>
+<pre><code>[1] &quot;j48&quot;</code></pre>
+<pre class="r"><code>J48_res = do_it_10_times(cross_validate, sonar_data, J48, &quot;class&quot;, 10, p=F)
+sonar_data_matrix &lt;- sonar_data_matrix %&gt;% cbind(J48_res)
+
+print('randomFores')</code></pre>
+<pre><code>[1] &quot;randomFores&quot;</code></pre>
+<pre class="r"><code>randomForest_res = do_it_10_times(cross_validate, sonar_data, randomForest, &quot;class&quot;, 10, p=F)
+sonar_data_matrix &lt;- sonar_data_matrix %&gt;% cbind(randomForest_res)
+
+print('svm')</code></pre>
+<pre><code>[1] &quot;svm&quot;</code></pre>
+<pre class="r"><code>svm_res = do_it_10_times(cross_validate, sonar_data, svm, &quot;class&quot;, 10, p=F)
+sonar_data_matrix &lt;- sonar_data_matrix %&gt;% cbind(svm_res)
+
+print('naive')</code></pre>
+<pre><code>[1] &quot;naive&quot;</code></pre>
+<pre class="r"><code>naiveBayes_res = do_it_10_times(cross_validate, sonar_data, naiveBayes, &quot;class&quot;, 10, p=F)
+sonar_data_matrix &lt;- sonar_data_matrix %&gt;% cbind(naiveBayes_res)
+
+print('bagging')</code></pre>
+<pre><code>[1] &quot;bagging&quot;</code></pre>
+<pre class="r"><code>#bagging_res = do_it_10_times(cross_validate, sonar_data, ipred::bagging, &quot;Class&quot;, 10, p=T, type='class')
+#sonar_data_matrix &lt;- sonar_data_matrix %&gt;% cbind(bagging_res)
+
+sonar_data_matrix &lt;- sonar_data_matrix[,-1]
+colnames(sonar_data_matrix) &lt;- c(&quot;J48&quot;, &quot;randomForest&quot;, &quot;svm&quot;, &quot;naiveBayes&quot;)</code></pre>
+</div>
 <div id="final-matrices" class="section level3">
 <h3>Final Matrices</h3>
-<pre class="r"><code>list &lt;- list(spec_data_matrix, hepatitis_data_matrix)
-datasets &lt;- c(&quot;Spect&quot;, &quot;Hepatitis&quot;)
+<pre class="r"><code>list &lt;- list(spec_data_matrix, hepatitis_data_matrix, sonar_data_matrix)
+datasets &lt;- c(&quot;Spect&quot;, &quot;Hepatitis&quot;, &quot;Sonar&quot;)
 metrics &lt;- c(&quot;Accuracy&quot;, &quot;Precision&quot;, &quot;Recall&quot;, &quot;F_Score&quot;)
 algorithm_names &lt;- c(&quot;J48&quot;, &quot;randomForest&quot;, &quot;svm&quot;, &quot;naiveBayes&quot;)
 
 final_matrix &lt;- c()
 counter &lt;- 1
 for(met in metrics) {
-  #print(met)
-  metric_df &lt;- data.frame(1:length(datasets))
-  for(alg in algorithm_names) {
-    algorithms &lt;- c()
-    #print(alg)
-    for(y in list) { 
-      #print(y)
-      #print(y[met, alg])
-      algorithms &lt;- algorithms %&gt;% append(y[met, alg])
+    #print(met)
+    metric_df &lt;- data.frame(1:length(datasets))
+    for(alg in algorithm_names) {
+        algorithms &lt;- c()
+        #print(alg)
+        for(y in list) { 
+            #print(y)
+            #print(y[met, alg])
+            algorithms &lt;- algorithms %&gt;% append(y[met, alg])
+        }
+        metric_df &lt;- metric_df %&gt;% cbind(algorithms)
     }
-    metric_df &lt;- metric_df %&gt;% cbind(algorithms)
-  }
-  metric_df &lt;- metric_df[,-1]
-  colnames(metric_df) &lt;- algorithm_names
-  rownames(metric_df) &lt;- datasets
-  
-  #print(paste(&quot;Using the metric [&quot;, met, &quot;]&quot;))
-  #print(metric_df)
-  final_matrix[[counter]] &lt;- metric_df
-  counter = counter + 1
+    metric_df &lt;- metric_df[,-1]
+    colnames(metric_df) &lt;- algorithm_names
+    rownames(metric_df) &lt;- datasets
+    
+    #print(paste(&quot;Using the metric [&quot;, met, &quot;]&quot;))
+    #print(metric_df)
+    final_matrix[[counter]] &lt;- metric_df
+    counter = counter + 1
 }</code></pre>
 <p>We’ll print each metric and it’s corresponding matrix of algorithms against datasets:</p>
 <div id="accuracy" class="section level4">
 <h4>Accuracy</h4>
 <pre><code>                J48 randomForest       svm naiveBayes
 Spect     0.8841493    0.9571865 0.8730696  0.6242004
-Hepatitis 0.8691439    0.2519370 0.7804781  0.8593788</code></pre>
+Hepatitis 0.8691439    0.2519370 0.7804781  0.8593788
+Sonar     0.8956201    0.9550338 0.8861078  0.6238158</code></pre>
 </div>
 <div id="precision" class="section level4">
 <h4>Precision</h4>
 <pre><code>                J48 randomForest       svm naiveBayes
 Spect     0.9031927    0.9776284 0.8955960  0.9669504
-Hepatitis 0.8973619          NaN 0.7804781  1.0000000</code></pre>
+Hepatitis 0.8973619          NaN 0.7804781  1.0000000
+Sonar     0.9087831    0.9792652 0.9040529  0.9612905</code></pre>
 </div>
 <div id="recall" class="section level4">
 <h4>Recall</h4>
 <pre><code>                J48 randomForest       svm naiveBayes
 Spect     0.9543788   0.96795685 0.9561394  0.5457835
-Hepatitis 0.9442880   0.05818107 1.0000000  0.8231511</code></pre>
+Hepatitis 0.9442880   0.05818107 1.0000000  0.8231511
+Sonar     0.9648843   0.96534514 0.9584248  0.5432880</code></pre>
 </div>
 <div id="f_score" class="section level4">
 <h4>F_Score</h4>
 <pre><code>                J48 randomForest       svm naiveBayes
-Spect     0.9269358      0.97223 0.9226147  0.6904408
-Hepatitis 0.9175208          NaN 0.8698153  0.8977439</code></pre>
+Spect     0.9269358    0.9722300 0.9226147  0.6904408
+Hepatitis 0.9175208          NaN 0.8698153  0.8977439
+Sonar     0.9345346    0.9715409 0.9290120  0.6904265</code></pre>
 <hr />
 </div>
 </div>
 <div id="head-to-head-comparison" class="section level3">
 <h3>Head to Head Comparison</h3>
-<p>Now let’s put these algorithms in a tournamet against eachother and see who wins :D</p>
+<p>Now let’s put these algorithms in a tournament against each-other and see who wins :D</p>
+<pre class="r"><code>tournamet &lt;- c()
+counter &lt;- 1
+for(met in metrics) {
+    battle &lt;- final_matrix[counter][[1]]
+    scores = c()
+    for(alg1 in algorithm_names) {
+        score &lt;- 0
+        for(alg2 in algorithm_names) {
+            for(ds in datasets) {
+                comp &lt;- battle[ds, alg1] &gt; battle[ds, alg2]
+                if(!is.na(comp) &amp;&amp; comp) {
+                    score &lt;- score + 1
+                }
+            }
+        }
+        scores[alg1] &lt;- score
+    }
+    scores &lt;- scores %&gt;% sort(decreasing = T)
+    tournamet[[counter]] &lt;- scores
+    counter &lt;- counter + 1
+}
+
+positions_scores &lt;- c(9, 7, 5, 3)
+final_tournamet &lt;- c()
+counter1 &lt;- 1
+for(alg in algorithm_names) {
+    final_tournamet[alg] = 0
+}
+for(met in metrics) {
+    battle &lt;- tournamet[[counter1]] %&gt;% names
+    counter2 &lt;- 1
+    for(name in battle) {
+        final_tournamet[name] &lt;- final_tournamet[name] + positions_scores[counter2]
+        counter2 &lt;- counter2 + 1
+    }
+    counter1 &lt;- counter1 + 1
+}</code></pre>
+<p>The numbers associated with each algorithm, indicate how many battles the algorithm has won fighting all other algorithm under the same metric</p>
+<div id="accuracy-1" class="section level4">
+<h4>Accuracy</h4>
+<pre><code>         J48 randomForest          svm   naiveBayes 
+           7            6            3            2 </code></pre>
+</div>
+<div id="precision-1" class="section level4">
+<h4>Precision</h4>
+<pre><code>randomForest   naiveBayes          J48          svm 
+           6            6            3            0 </code></pre>
+</div>
+<div id="recall-1" class="section level4">
+<h4>Recall</h4>
+<pre><code>randomForest          svm          J48   naiveBayes 
+           6            6            5            1 </code></pre>
+</div>
+<div id="f_score-1" class="section level4">
+<h4>F_Score</h4>
+<pre><code>         J48 randomForest          svm   naiveBayes 
+           6            6            2            1 </code></pre>
+<hr />
+</div>
+<div id="and-for-the-final-results" class="section level4">
+<h4>And for the FINAL RESULTS !!</h4>
+<pre><code>randomForest          J48          svm   naiveBayes 
+          32           28           20           16 </code></pre>
+</div>
 </div>
 </div>
 
