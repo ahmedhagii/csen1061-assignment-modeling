@@ -21,14 +21,14 @@ set.seed(415)
 
 
 Let's start by loading the data and shuffling the rows.
-```{r, warning=FALSE, cache=T, comment=NA}
+```{r, warning=FALSE, cache=F, comment=NA}
 sonar_data = read.csv("data/sonar.all-data")
 sonar_data <- sonar_data[sample(nrow(sonar_data)), ]
 ```
 
 now we do the initial experiment where we train and test a decision tree on the same data set.
 
-```{r, warning=FALSE, cache=T, comment=NA}
+```{r, warning=FALSE, cache=F, comment=NA}
 library(RWeka)
 fit <- J48(R~., data=sonar_data)
 summary(fit)
@@ -57,76 +57,76 @@ as we can see when training and testing on the same data set, the decision tree 
 
 This function takes the data and the desired model and applies the k-fold cross validation and returns the result as a data frame for each metric and that metric value in each one of the k-folds.
 
-```{r, message=FALSE, output=FALSE, cache=T, comment=NA}
+```{r, message=FALSE, output=FALSE, cache=F, comment=NA}
 cross_validate <- function(data, model, class, folds, ntree = NULL, print=FALSE, type=NULL) {
-	# folds
-	k = folds
-	
-	# give each row an id from 1:k representing which fold it's in
-	data$id <- sample(1:k, nrow(data), replace = TRUE)
-	list <- 1:k
-	
-	data[[class]] <- factor(data[[class]])
-	#progress.bar <- create_progress_bar("text")
-	#progress.bar$init(k)
-	
-	accuracies = c()
-	precisions = c()
-	recalls = c()
-	f_scores = c()
-	
-	for (i in 1:k){
-		# get all rows with id != i to be in training set and those with id == i will be testing set
-		trainingset <- data %>% subset(id %in% list[-i])
-		testset <- data %>% subset(id %in% c(i))
-		# building the formula
-		frm <- paste(class, ".", sep=" ~ ")
-		
-		# building the fitting model
-		if(is.null(ntree)) {
-			fit <- frm %>% formula %>% model(data=data)
-		}else if(!is.null(type)) {
-			fit <- frm %>% formula %>% model(data=data, type=type)
-		}else{
-			fit <- frm %>% formula %>% model(data=data, ntree = ntree)
-		}
-		
-		# get the index of the class in the list of feature names
-		index <- which(data %>% names == class)
-		
-		# predict on the test set without the desired class column
-		pred <- predict(fit, testset[,-index])
-		
-		confusion_matrix <- table(pred, testset[[class]])
-		#rownames(confusion_matrix) <- c("Predicted No", "Predicted Yes")
-		#colnames(confusion_matrix) <- c("Actual No", "Actual Yes")
-		
-		if(print) {
-			print(confusion_matrix)
-		}
-		
-		TN <- confusion_matrix[1,1]
-		TP <- confusion_matrix[2,2]
-		FP <- confusion_matrix[2,1]
-		FN <- confusion_matrix[1,2]
-		
-		accuracy <- (TP + TN) / (testset %>% nrow)
-		precision <- (TP) / (FP + TP)
-		recall <- (TP) / (TP + FN)
-		f_score <- 2 * (recall * precision) / (recall + precision)
-		
-		accuracies <- accuracies %>% append(accuracy)
-		precisions <- precisions %>% append(precision)
-		recalls <- recalls %>% append(recall)
-		f_scores <- f_scores %>% append(f_score)
-		
-		#progress.bar$step()
-	}
-	
-	return (as.data.frame(list("Accuracy" = accuracies, 
-							   "Precision" = precisions,
-							   "Recall" = recalls,
-							   "F_Score" = f_scores)))
+    # folds
+    k = folds
+    
+    # give each row an id from 1:k representing which fold it's in
+    data$id <- sample(1:k, nrow(data), replace = TRUE)
+    list <- 1:k
+    
+    data[[class]] <- factor(data[[class]])
+    #progress.bar <- create_progress_bar("text")
+    #progress.bar$init(k)
+    
+    accuracies = c()
+    precisions = c()
+    recalls = c()
+    f_scores = c()
+    
+    for (i in 1:k){
+        # get all rows with id != i to be in training set and those with id == i will be testing set
+        trainingset <- data %>% subset(id %in% list[-i])
+        testset <- data %>% subset(id %in% c(i))
+        # building the formula
+        frm <- paste(class, ".", sep=" ~ ")
+        
+        # building the fitting model
+        if(is.null(ntree)) {
+            fit <- frm %>% formula %>% model(data=data)
+        }else if(!is.null(type)) {
+            fit <- frm %>% formula %>% model(data=data, type=type)
+        }else{
+            fit <- frm %>% formula %>% model(data=data, ntree = ntree)
+        }
+        
+        # get the index of the class in the list of feature names
+        index <- which(data %>% names == class)
+        
+        # predict on the test set without the desired class column
+        pred <- predict(fit, testset[,-index])
+        
+        confusion_matrix <- table(pred, testset[[class]])
+        #rownames(confusion_matrix) <- c("Predicted No", "Predicted Yes")
+        #colnames(confusion_matrix) <- c("Actual No", "Actual Yes")
+        
+        if(print) {
+            print(confusion_matrix)
+        }
+        
+        TN <- confusion_matrix[1,1]
+        TP <- confusion_matrix[2,2]
+        FP <- confusion_matrix[2,1]
+        FN <- confusion_matrix[1,2]
+        
+        accuracy <- (TP + TN) / (testset %>% nrow)
+        precision <- (TP) / (FP + TP)
+        recall <- (TP) / (TP + FN)
+        f_score <- 2 * (recall * precision) / (recall + precision)
+        
+        accuracies <- accuracies %>% append(accuracy)
+        precisions <- precisions %>% append(precision)
+        recalls <- recalls %>% append(recall)
+        f_scores <- f_scores %>% append(f_score)
+        
+        #progress.bar$step()
+    }
+    
+    return (as.data.frame(list("Accuracy" = accuracies, 
+                               "Precision" = precisions,
+                               "Recall" = recalls,
+                               "F_Score" = f_scores)))
 }
 
 ```
@@ -134,7 +134,7 @@ cross_validate <- function(data, model, class, folds, ntree = NULL, print=FALSE,
 Now let's run the 10-fold cross-validation on different algorithms and see the results
 
 ### 1. C4.5 decision tree:
-```{r, message=FALSE, output=FALSE, cache=T, comment=NA}
+```{r, message=FALSE, output=FALSE, cache=F, comment=NA}
 res <- cross_validate(sonar_data, J48, "R", 10)
 ```
 ```{r, comment=NA}
@@ -143,7 +143,7 @@ summary(res)[4,]
 
 
 ### 2. random forest with 5 trees:
-```{r, message=FALSE, output=FALSE, cache=T, comment=NA}
+```{r, message=FALSE, output=FALSE, cache=F, comment=NA}
 res <- cross_validate(sonar_data, randomForest, "R", 10, 5)
 ```
 ```{r, comment=NA}
@@ -152,7 +152,7 @@ summary(res)[4,]
 
 
 ### 3. random forest with 20 trees:
-```{r, message=FALSE, output=FALSE, cache=T, comment=NA}
+```{r, message=FALSE, output=FALSE, cache=F, comment=NA}
 res <- cross_validate(sonar_data, randomForest, "R", 10, 15)
 ```
 ```{r, comment=NA}
@@ -162,7 +162,7 @@ summary(res)[4,]
 as we can see by increasing the number of trees to 15, we could achieve a 100% accuracy. The reason is that random forest implements the ensemble learning method. Thus, by having 15 decision trees, making a decision becomes very accurate.
 
 ### 4. Support Vector Machines:
-```{r, message=FALSE, output=FALSE, cache=T, comment=NA}
+```{r, message=FALSE, output=FALSE, cache=F, comment=NA}
 res <- cross_validate(sonar_data, svm, "R", 10)
 ```
 ```{r, comment=NA}
@@ -172,7 +172,7 @@ summary(res)[4,]
 the support-vector-machines does a very good job on the `Recall` metric. It doesn't matter how times I try, it always gives a 1. However, this happens when the question is `is it a rock?`, but not the other way around. The reason might be in the way the svm work, while trying to split the data into two categories and maximizing the gap between the two, the rocks had some sub-characteristics that once were there made them absolutely distinguishable from the metals. In other words, if a subset of the features met a certain criteria, then the candidate would always be a rock. That's why it never fails to identify a rock, but sometimes may consider a metal as a rock, because perhaps the metals didn't have that subset of features that made them unique.
 
 ### 5. Naive Bayes:
-```{r, message=FALSE, output=FALSE, cache=T, comment=NA}
+```{r, message=FALSE, output=FALSE, cache=F, comment=NA}
 res <- cross_validate(sonar_data, naiveBayes, "R", 10)
 ```
 ```{r, comment=NA}
@@ -187,112 +187,107 @@ The naive-Bayes performs poorly, why?
 
 First, we're gonna normalize the data, because not doing so (depending on the dataset) may lead to incorrect results or the training process taking time. I'll scale using the min-max scale and scale the data in the interval [0,1]. Moreover, I'll map 'R' into 1 and 'M' into 0 to keep everything numerical.
 
-```{r, message=FALSE, output=FALSE, cache=T, comment=NA}
-sonar_data_mapped <- sonar_data
-sonar_data_mapped$R <- sonar_data %>% apply(1, function(x) {
-	if(x['R'] == 'R') {
-		return (1)
-	}
-	return (0)
-})
-maxs <- apply(sonar_data_mapped, 2, max) 
-mins <- apply(sonar_data_mapped, 2, min)
+```{r, message=FALSE, output=FALSE, cache=F, comment=NA}
 
-sonar_data_scaled <- as.data.frame(scale(sonar_data_mapped, center = mins, scale = maxs - mins))
+prepare_for_NN <- function(data, class) {
+    data_mapped <- data
+    if(class == 'R') {
+        data_mapped$R <- data %>% apply(1, function(x) {
+            if(x['R'] == 'R') {
+                return (1)
+            }
+            return (0)
+        })
+    }
+    maxs <- apply(data_mapped, 2, max, na.rm=T)
+    mins <- apply(data_mapped, 2, min, na.rm=T)
+    
+    data_scaled <- as.data.frame(scale(data_mapped, center = mins, scale = maxs - mins))
+    
+    return (data_scaled)
+}
 ```
 
 Now let's prepare the k-fold to run on the neural networks algorithm. Since running the NN requires some extra steps and modifications, I'll rewrite the function we wrote earlier to accommodate the changes.
-```{r, message=FALSE, echo=FALSE, cache=T, comment=NA}
+```{r, message=FALSE, echo=FALSE, cache=F, comment=NA}
 cross_validate_NN <- function(data, class, folds, print=FALSE) {
-	
-	sonar_data_mapped <- sonar_data
-	sonar_data_mapped$R <- sonar_data %>% apply(1, function(x) {
-		if(x['R'] == 'R') {
-			return (1)
-		}
-		return (0)
-	})
-	maxs <- apply(sonar_data_mapped, 2, max) 
-	mins <- apply(sonar_data_mapped, 2, min)
-	
-	sonar_data_scaled <- as.data.frame(scale(sonar_data_mapped, center = mins, scale = maxs - mins))
-
-	# folds
-	k = folds
-	
-	# give each row an id from 1:k representing which fold it's in
-	data$id <- sample(1:k, nrow(data), replace = TRUE)
-	list <- 1:k
-	
-	#progress.bar <- create_progress_bar("text")
-	#progress.bar$init(k)
-	
-	accuracies = c()
-	precisions = c()
-	recalls = c()
-	f_scores = c()
-	
-	for (i in 1:k){
-		# get all rows with id != i to be in training set and those with id == i will be testing set
-		trainingset <- data %>% subset(id %in% list[-i])
-		testset <- data %>% subset(id %in% c(i))
-		# building the formula
-		columns <- paste(data %>% dplyr::select(-R) %>% names, collapse = " + ")
-		frm <- as.formula(paste(class, columns, sep=" ~ "))
-		
-		# building the fitting model
-		nn <- neuralnet(frm, data=data,hidden=c(5,3),linear.output=FALSE)
-		
-		# get the index of the class in the list of feature names
-		index <- which(data %>% names == class)
-		
-		# predict on the test set without the desired class column
-		pred <- neuralnet::compute(nn, testset[,-index])
-		
-		pred$R <- pred$net.result %>% apply(1, function(row){
-			if(row < 0.5) {
-				return (0)
-			}
-			return (1)
-		})
-		
-		confusion_matrix <- table(pred$R, testset[[class]])
-		#rownames(confusion_matrix) <- c("Predicted No", "Predicted Yes")
-		#colnames(confusion_matrix) <- c("Actual No", "Actual Yes")
-		
-		if(print) {
-			print(confusion_matrix)
-		}
-		
-		TN <- confusion_matrix[1,1]
-		TP <- confusion_matrix[2,2]
-		FP <- confusion_matrix[2,1]
-		FN <- confusion_matrix[1,2]
-		
-		accuracy <- (TP + TN) / (testset %>% nrow)
-		precision <- (TP) / (FP + TP)
-		recall <- (TP) / (TP + FN)
-		f_score <- 2 * (recall * precision) / (recall + precision)
-		
-		accuracies <- accuracies %>% append(accuracy)
-		precisions <- precisions %>% append(precision)
-		recalls <- recalls %>% append(recall)
-		f_scores <- f_scores %>% append(f_score)
-		
-		# progress.bar$step()
-	}
-	
-	return (as.data.frame(list("Accuracy" = accuracies, 
-							   "Precision" = precisions,
-							   "Recall" = recalls,
-							   "F_Score" = f_scores)))
+    # folds
+    k = folds
+    
+    # give each row an id from 1:k representing which fold it's in
+    data$id <- sample(1:k, nrow(data), replace = TRUE)
+    list <- 1:k
+    
+    #progress.bar <- create_progress_bar("text")
+    #progress.bar$init(k)
+    
+    accuracies = c()
+    precisions = c()
+    recalls = c()
+    f_scores = c()
+    
+    for (i in 1:k){
+        # get all rows with id != i to be in training set and those with id == i will be testing set
+        trainingset <- data %>% subset(id %in% list[-i])
+        testset <- data %>% subset(id %in% c(i))
+        # building the formula
+        columns <- paste(data %>% dplyr::select(-R) %>% names, collapse = " + ")
+        frm <- as.formula(paste(class, columns, sep=" ~ "))
+        
+        # building the fitting model
+        nn <- neuralnet(frm, data=data,hidden=c(5,3),linear.output=FALSE)
+        
+        # get the index of the class in the list of feature names
+        index <- which(data %>% names == class)
+        
+        # predict on the test set without the desired class column
+        pred <- neuralnet::compute(nn, testset[,-index])
+        
+        pred$R <- pred$net.result %>% apply(1, function(row){
+            if(row < 0.5) {
+                return (0)
+            }
+            return (1)
+        })
+        
+        confusion_matrix <- table(pred$R, testset[[class]])
+        #rownames(confusion_matrix) <- c("Predicted No", "Predicted Yes")
+        #colnames(confusion_matrix) <- c("Actual No", "Actual Yes")
+        
+        if(print) {
+            print(confusion_matrix)
+        }
+        
+        TN <- confusion_matrix[1,1]
+        TP <- confusion_matrix[2,2]
+        FP <- confusion_matrix[2,1]
+        FN <- confusion_matrix[1,2]
+        
+        accuracy <- (TP + TN) / (testset %>% nrow)
+        precision <- (TP) / (FP + TP)
+        recall <- (TP) / (TP + FN)
+        f_score <- 2 * (recall * precision) / (recall + precision)
+        
+        accuracies <- accuracies %>% append(accuracy)
+        precisions <- precisions %>% append(precision)
+        recalls <- recalls %>% append(recall)
+        f_scores <- f_scores %>% append(f_score)
+        
+        # progress.bar$step()
+    }
+    
+    return (as.data.frame(list("Accuracy" = accuracies, 
+                               "Precision" = precisions,
+                               "Recall" = recalls,
+                               "F_Score" = f_scores)))
 }
 ```
 
 As I read somewhere that `linear.output` is used to specify whether we want to do regression or classification. We'll set it to FALSE as this is supposed to give us the classification behavior.
 
 Now let's call our function:
-```{r, echo=FALSE, message=FALSE, cache=T, comment=NA}
+```{r, echo=FALSE, message=FALSE, cache=F, comment=NA}
+sonar_data_scaled <- prepare_for_NN(sonar_data, 'R')
 res <- cross_validate_NN(data=sonar_data_scaled, class= "R", folds=10,  print=F)
 ```
 ```{r, comment=NA}
@@ -303,7 +298,7 @@ summary(res)[4,]
 
 For this part, I'll use CART's bagging algorithm which uses CART's decision tree instead of C4.5
 
-```{r, cache=T, comment=NA}
+```{r, cache=F, comment=NA}
 res <- cross_validate(sonar_data, ipred::bagging, "R", folds= 10, type='class')
 summary(res)[4,]
 ```
@@ -318,22 +313,22 @@ again as the randomForest with 15 trees we're getting perfect results as the lik
 
 This function will perform each 10-fold, 10 times and return the results.
 
-```{r, message=FALSE, warning=FALSE, output=FALSE, cache=T, comment=NA}
+```{r, message=FALSE, warning=FALSE, output=FALSE, cache=F, comment=NA}
 do_it_10_times <- function(fn, ...) {
-	acc = c()
-	prec = c()
-	rec = c()
-	f_scr = c()
-	
-	for(i in 1:3) {
-		res <- fn(...)
-		acc <- acc %>% append(res$Accuracy %>% mean)
-		prec <- prec %>% append(res$Precision %>% mean)
-		rec <- rec %>% append(res$Recall %>% mean)
-		f_scr <- f_scr %>% append(res$F_Score %>% mean)
-	}
-	list <- c(acc %>% mean, prec %>% mean, rec %>% mean, f_scr %>% mean)
-	return (list)
+    acc = c()
+    prec = c()
+    rec = c()
+    f_scr = c()
+    
+    for(i in 1:7) {
+        res <- fn(...)
+        acc <- acc %>% append(res$Accuracy %>% mean)
+        prec <- prec %>% append(res$Precision %>% mean)
+        rec <- rec %>% append(res$Recall %>% mean)
+        f_scr <- f_scr %>% append(res$F_Score %>% mean)
+    }
+    list <- c(acc %>% mean, prec %>% mean, rec %>% mean, f_scr %>% mean)
+    return (list)
 }
 
 ```
@@ -341,18 +336,19 @@ do_it_10_times <- function(fn, ...) {
 ---
 
 ### Hepatitis Data
-```{r, message=FALSE, warning=FALSE, cache=T, comment=NA}
+```{r, message=FALSE, warning=FALSE, cache=F, comment=NA}
 hepatitis_data = read.csv("data/hepatitis.data")
 hepatitis_data <- hepatitis_data[sample(nrow(hepatitis_data)), ]
 colnames(hepatitis_data) = c("Class", "AGE", "SEX", "STEROID",
-							 "ANTIVIRALS", "FATIGUE", "MALAISE", 
-							 "ANOREXIA", "LIVER_BIG", "LIVER_FIRM",
-							 "SPLEEN_PALPABLE", "SPIDERS", "ASCITES", 
-							 "VARICES", "BILIRUBIN", "ALK_PHOSPHATE", "SGOT", 
-							 "ALBUMIN", "PROTIME", "HISTOLOGY")
+                             "ANTIVIRALS", "FATIGUE", "MALAISE", 
+                             "ANOREXIA", "LIVER_BIG", "LIVER_FIRM",
+                             "SPLEEN_PALPABLE", "SPIDERS", "ASCITES", 
+                             "VARICES", "BILIRUBIN", "ALK_PHOSPHATE", "SGOT", 
+                             "ALBUMIN", "PROTIME", "HISTOLOGY")
 
 hepatitis_data$ALK_PHOSPHATE <- as.numeric(hepatitis_data$ALK_PHOSPHATE)
 hepatitis_data$SGOT <- as.numeric(hepatitis_data$SGOT)
+#hepatitis_data[hepatitis_data == '?'] = NA
 ```
 
 
@@ -373,27 +369,32 @@ hepatitis_data_matrix <- hepatitis_data_matrix %>% cbind(svm_res)
 naiveBayes_res = do_it_10_times(cross_validate, hepatitis_data, naiveBayes, "Class", 10, p=F)
 hepatitis_data_matrix <- hepatitis_data_matrix %>% cbind(naiveBayes_res)
 
-#bagging_res = do_it_10_times(cross_validate, hepatitis_data, ipred::bagging, "Class", 10, p=T, type='class')
-#hepatitis_data_matrix <- hepatitis_data_matrix %>% cbind(bagging_res)
+bagging_res = do_it_10_times(cross_validate, hepatitis_data, ipred::bagging, "Class", 10, p=F, type='class')
+hepatitis_data_matrix <- hepatitis_data_matrix %>% cbind(bagging_res)
+
+#hepatitis_data_scaled <- prepare_for_NN(hepatitis_data, 'Class')
+#nn_res <- cross_validate_NN(data=hepatitis_data_scaled, class= "Class", folds=10,  print=F)
+#hepatitis_data_matrix <- hepatitis_data_matrix %>% cbind(nn_res)
 
 hepatitis_data_matrix <- hepatitis_data_matrix[,-1]
-colnames(hepatitis_data_matrix) <- c("J48", "randomForest", "svm", "naiveBayes")
+colnames(hepatitis_data_matrix) <- c("J48", "randomForest", "svm", "naiveBayes", "bagging")
 ```
 
 ---
 
 ### Spec Data
 
-```{r, message=FALSE, warning=FALSE, cache=T, comment=NA}
+```{r, message=FALSE, warning=FALSE, cache=F, comment=NA}
 spec_data <- read.csv("data/SPECT.test", header=F)
 colnames(spec_data) = c("class", "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12", "F13", "F14", "F15", "F16", "F17", "F18", "F19", "F20", "F21", "F22")
 spec_data2 <- read.csv("data/SPECT.train", header=F)
 colnames(spec_data2) = c("class", "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12", "F13", "F14", "F15", "F16", "F17", "F18", "F19", "F20", "F21", "F22")
 spec_data <- rbind(spec_data, spec_data2) 
 spec_data <- spec_data[sample(nrow(spec_data)), ]
+spec_data[spec_data == '?'] = NA
 ```
 
-```{r, message=FALSE, warning=FALSE, output=FALSE, cache=T, comment=NA}
+```{r, message=FALSE, warning=FALSE, output=FALSE, cache=F, comment=NA}
 spec_data_matrix <- data.frame(1:4)
 rownames(spec_data_matrix) <- c("Accuracy", "Precision", "Recall", "F_Score")
 
@@ -409,78 +410,75 @@ spec_data_matrix <- spec_data_matrix %>% cbind(svm_res)
 naiveBayes_res = do_it_10_times(cross_validate, spec_data, naiveBayes, "class", 10, p=F)
 spec_data_matrix <- spec_data_matrix %>% cbind(naiveBayes_res)
 
-#bagging_res = do_it_10_times(cross_validate, spec_data, ipred::bagging, "Class", 10, p=T, type='class')
-#spec_data_matrix <- spec_data_matrix %>% cbind(bagging_res)
+bagging_res = do_it_10_times(cross_validate, spec_data, ipred::bagging, "class", 10, p=F, type='class')
+spec_data_matrix <- spec_data_matrix %>% cbind(bagging_res)
 
 spec_data_matrix <- spec_data_matrix[,-1]
-colnames(spec_data_matrix) <- c("J48", "randomForest", "svm", "naiveBayes")
+colnames(spec_data_matrix) <- c("J48", "randomForest", "svm", "naiveBayes", "bagging")
 ```
 
 ### Sonar Data
 
-```{r, message=FALSE, warning=FALSE, cache=T, comment=NA}
-sonar_data <- read.csv("data/SPECT.test", header=F)
-colnames(sonar_data) = c("class", "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12", "F13", "F14", "F15", "F16", "F17", "F18", "F19", "F20", "F21", "F22")
-sonar_data2 <- read.csv("data/SPECT.train", header=F)
-colnames(sonar_data2) = c("class", "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12", "F13", "F14", "F15", "F16", "F17", "F18", "F19", "F20", "F21", "F22")
-sonar_data <- rbind(sonar_data, sonar_data2) 
+```{r, message=FALSE, warning=FALSE, cache=F, comment=NA}
+sonar_data <- read.csv("data/sonar.all-data", header=T)
 sonar_data <- sonar_data[sample(nrow(sonar_data)), ]
+#sonar_data[sonar_data == '?'] = NA
 ```
 
-```{r, message=FALSE, warning=FALSE, output=FALSE, cache=T, comment=NA}
+```{r, message=FALSE, warning=FALSE, output=FALSE, cache=F, comment=NA}
 sonar_data_matrix <- data.frame(1:4)
 rownames(sonar_data_matrix) <- c("Accuracy", "Precision", "Recall", "F_Score")
 
-J48_res = do_it_10_times(cross_validate, sonar_data, J48, "class", 10, p=F)
+J48_res = do_it_10_times(cross_validate, sonar_data, J48, "R", 10, p=F)
 sonar_data_matrix <- sonar_data_matrix %>% cbind(J48_res)
 
-randomForest_res = do_it_10_times(cross_validate, sonar_data, randomForest, "class", 10, p=F)
+randomForest_res = do_it_10_times(cross_validate, sonar_data, randomForest, "R", 10, p=F)
 sonar_data_matrix <- sonar_data_matrix %>% cbind(randomForest_res)
 
-svm_res = do_it_10_times(cross_validate, sonar_data, svm, "class", 10, p=F)
+svm_res = do_it_10_times(cross_validate, sonar_data, svm, "R", 10, p=F)
 sonar_data_matrix <- sonar_data_matrix %>% cbind(svm_res)
 
-naiveBayes_res = do_it_10_times(cross_validate, sonar_data, naiveBayes, "class", 10, p=F)
+naiveBayes_res = do_it_10_times(cross_validate, sonar_data, naiveBayes, "R", 10, p=F)
 sonar_data_matrix <- sonar_data_matrix %>% cbind(naiveBayes_res)
 
-#bagging_res = do_it_10_times(cross_validate, sonar_data, ipred::bagging, "Class", 10, p=T, type='class')
-#sonar_data_matrix <- sonar_data_matrix %>% cbind(bagging_res)
+bagging_res = do_it_10_times(cross_validate, sonar_data, ipred::bagging, "R", 10, p=F, type='class')
+sonar_data_matrix <- sonar_data_matrix %>% cbind(bagging_res)
 
 sonar_data_matrix <- sonar_data_matrix[,-1]
-colnames(sonar_data_matrix) <- c("J48", "randomForest", "svm", "naiveBayes")
+colnames(sonar_data_matrix) <- c("J48", "randomForest", "svm", "naiveBayes", "bagging")
 ```
 
 ### Final Matrices
 
-```{r, comment=NA, cache=T}
+```{r, comment=NA, cache=F}
 list <- list(spec_data_matrix, hepatitis_data_matrix, sonar_data_matrix)
 datasets <- c("Spect", "Hepatitis", "Sonar")
 metrics <- c("Accuracy", "Precision", "Recall", "F_Score")
-algorithm_names <- c("J48", "randomForest", "svm", "naiveBayes")
+algorithm_names <- c("J48", "randomForest", "svm", "naiveBayes", "bagging")
 
 final_matrix <- c()
 counter <- 1
 for(met in metrics) {
-	#print(met)
-	metric_df <- data.frame(1:length(datasets))
-	for(alg in algorithm_names) {
-		algorithms <- c()
-		#print(alg)
-		for(y in list) { 
-			#print(y)
-			#print(y[met, alg])
-			algorithms <- algorithms %>% append(y[met, alg])
-		}
-		metric_df <- metric_df %>% cbind(algorithms)
-	}
-	metric_df <- metric_df[,-1]
-	colnames(metric_df) <- algorithm_names
-	rownames(metric_df) <- datasets
-	
-	#print(paste("Using the metric [", met, "]"))
-	#print(metric_df)
-	final_matrix[[counter]] <- metric_df
-	counter = counter + 1
+    #print(met)
+    metric_df <- data.frame(1:length(datasets))
+    for(alg in algorithm_names) {
+        algorithms <- c()
+        #print(alg)
+        for(y in list) { 
+            #print(y)
+            #print(y[met, alg])
+            algorithms <- algorithms %>% append(y[met, alg])
+        }
+        metric_df <- metric_df %>% cbind(algorithms)
+    }
+    metric_df <- metric_df[,-1]
+    colnames(metric_df) <- algorithm_names
+    rownames(metric_df) <- datasets
+    
+    #print(paste("Using the metric [", met, "]"))
+    #print(metric_df)
+    final_matrix[[counter]] <- metric_df
+    counter = counter + 1
 }
 ```
 
@@ -510,6 +508,7 @@ final_matrix[3][[1]]
 final_matrix[4][[1]]
 ```
 
+As we can see the forest and J48 performed quite well on most data sets and it's no surprise since they both depend on a decision tree, which is a good classification tool. However on the Hepatitis data set, the random forest algorithm perforemd very poorly. I guess the reason was that the data itself isn't applicable to a decision tree. Since we needed to classify who would live or die based on some features like age, liver size, some anzymes and vitamines levels. So I imagine the tree had problems while branching becuase it couldn't gain a lot of information per branch and the entropy remained almost consistently high among all levels of the tree. That's why adding more trees using the forest didn't enhance the results, cuz all trees were still confused and producing conflicting decisions. However, the J48 which useds a single decision tree performed while, but that could be an error I made while computing something or it just got lucky :), but it souldn't do this good and it should've struggled more like it's more advnced sibling randomForest. 
 
 ***
 
@@ -517,43 +516,43 @@ final_matrix[4][[1]]
 
 Now let's put these algorithms in a tournament against each-other and see who wins :D
 
-```{r, comment=NA, cache=T}
+```{r, comment=NA, cache=F}
 tournamet <- c()
 counter <- 1
 for(met in metrics) {
-	battle <- final_matrix[counter][[1]]
-	scores = c()
-	for(alg1 in algorithm_names) {
-		score <- 0
-		for(alg2 in algorithm_names) {
-			for(ds in datasets) {
-				comp <- battle[ds, alg1] > battle[ds, alg2]
-				if(!is.na(comp) && comp) {
-					score <- score + 1
-				}
-			}
-		}
-		scores[alg1] <- score
-	}
-	scores <- scores %>% sort(decreasing = T)
-	tournamet[[counter]] <- scores
-	counter <- counter + 1
+    battle <- final_matrix[counter][[1]]
+    scores = c()
+    for(alg1 in algorithm_names) {
+        score <- 0
+        for(alg2 in algorithm_names) {
+            for(ds in datasets) {
+                comp <- battle[ds, alg1] > battle[ds, alg2]
+                if(!is.na(comp) && comp) {
+                    score <- score + 1
+                }
+            }
+        }
+        scores[alg1] <- score
+    }
+    scores <- scores %>% sort(decreasing = T)
+    tournamet[[counter]] <- scores
+    counter <- counter + 1
 }
 
-positions_scores <- c(9, 7, 5, 3)
+positions_scores <- c(11, 9, 7, 5, 3)
 final_tournamet <- c()
 counter1 <- 1
 for(alg in algorithm_names) {
-	final_tournamet[alg] = 0
+    final_tournamet[alg] = 0
 }
 for(met in metrics) {
-	battle <- tournamet[[counter1]] %>% names
-	counter2 <- 1
-	for(name in battle) {
-		final_tournamet[name] <- final_tournamet[name] + positions_scores[counter2]
-		counter2 <- counter2 + 1
-	}
-	counter1 <- counter1 + 1
+    battle <- tournamet[[counter1]] %>% names
+    counter2 <- 1
+    for(name in battle) {
+        final_tournamet[name] <- final_tournamet[name] + positions_scores[counter2]
+        counter2 <- counter2 + 1
+    }
+    counter1 <- counter1 + 1
 }
 ```
 
@@ -589,4 +588,9 @@ tournamet[4][[1]]
 ```{r, comment=NA, echo=F}
 final_tournamet %>% sort(decreasing = T)
 ```
+
+The random-forest performed so well on different data sets, because of underlying decision tree which is a powerful classification tool as long as the data is not huge. Once the data is huge enough or there are lots of features, building a single tree would be expensive let alone build a forest of them. However, since our data sets were hundreds big, the complexity wasn't an issue and the algorithm out performed the rest.
+
+
+
 

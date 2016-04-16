@@ -291,17 +291,23 @@ Predicted YES FP = 1 TP = 93</p>
 <div id="neural-networks" class="section level3">
 <h3>6. Neural Networks:</h3>
 <p>First, we’re gonna normalize the data, because not doing so (depending on the dataset) may lead to incorrect results or the training process taking time. I’ll scale using the min-max scale and scale the data in the interval [0,1]. Moreover, I’ll map ‘R’ into 1 and ‘M’ into 0 to keep everything numerical.</p>
-<pre class="r"><code>sonar_data_mapped &lt;- sonar_data
-sonar_data_mapped$R &lt;- sonar_data %&gt;% apply(1, function(x) {
-    if(x['R'] == 'R') {
-        return (1)
+<pre class="r"><code>prepare_for_NN &lt;- function(data, class) {
+    data_mapped &lt;- data
+    if(class == 'R') {
+        data_mapped$R &lt;- data %&gt;% apply(1, function(x) {
+            if(x['R'] == 'R') {
+                return (1)
+            }
+            return (0)
+        })
     }
-    return (0)
-})
-maxs &lt;- apply(sonar_data_mapped, 2, max) 
-mins &lt;- apply(sonar_data_mapped, 2, min)
-
-sonar_data_scaled &lt;- as.data.frame(scale(sonar_data_mapped, center = mins, scale = maxs - mins))</code></pre>
+    maxs &lt;- apply(data_mapped, 2, max, na.rm=T)
+    mins &lt;- apply(data_mapped, 2, min, na.rm=T)
+    
+    data_scaled &lt;- as.data.frame(scale(data_mapped, center = mins, scale = maxs - mins))
+    
+    return (data_scaled)
+}</code></pre>
 <p>Now let’s prepare the k-fold to run on the neural networks algorithm. Since running the NN requires some extra steps and modifications, I’ll rewrite the function we wrote earlier to accommodate the changes.</p>
 <p>As I read somewhere that <code>linear.output</code> is used to specify whether we want to do regression or classification. We’ll set it to FALSE as this is supposed to give us the classification behavior.</p>
 <p>Now let’s call our function:</p>
@@ -330,7 +336,7 @@ summary(res)[4,]</code></pre>
     rec = c()
     f_scr = c()
     
-    for(i in 1:3) {
+    for(i in 1:7) {
         res &lt;- fn(...)
         acc &lt;- acc %&gt;% append(res$Accuracy %&gt;% mean)
         prec &lt;- prec %&gt;% append(res$Precision %&gt;% mean)
@@ -353,38 +359,33 @@ colnames(hepatitis_data) = c(&quot;Class&quot;, &quot;AGE&quot;, &quot;SEX&quot;
                              &quot;ALBUMIN&quot;, &quot;PROTIME&quot;, &quot;HISTOLOGY&quot;)
 
 hepatitis_data$ALK_PHOSPHATE &lt;- as.numeric(hepatitis_data$ALK_PHOSPHATE)
-hepatitis_data$SGOT &lt;- as.numeric(hepatitis_data$SGOT)</code></pre>
+hepatitis_data$SGOT &lt;- as.numeric(hepatitis_data$SGOT)
+#hepatitis_data[hepatitis_data == '?'] = NA</code></pre>
 <pre class="r"><code>hepatitis_data_matrix &lt;- data.frame()
 hepatitis_data_matrix &lt;- cbind(c(0,0,0,0))
 rownames(hepatitis_data_matrix) &lt;- c(&quot;Accuracy&quot;, &quot;Precision&quot;, &quot;Recall&quot;, &quot;F_Score&quot;)
 
-print('j48')</code></pre>
-<pre><code>[1] &quot;j48&quot;</code></pre>
-<pre class="r"><code>J48_res = do_it_10_times(cross_validate, hepatitis_data, J48, &quot;Class&quot;, 10, p=F)
+J48_res = do_it_10_times(cross_validate, hepatitis_data, J48, &quot;Class&quot;, 10, p=F)
 hepatitis_data_matrix &lt;- hepatitis_data_matrix %&gt;% cbind(J48_res)
 
-print('randomFores')</code></pre>
-<pre><code>[1] &quot;randomFores&quot;</code></pre>
-<pre class="r"><code>randomForest_res = do_it_10_times(cross_validate, hepatitis_data, randomForest, &quot;Class&quot;, 10, p=F)
+randomForest_res = do_it_10_times(cross_validate, hepatitis_data, randomForest, &quot;Class&quot;, 10, p=F)
 hepatitis_data_matrix &lt;- hepatitis_data_matrix %&gt;% cbind(randomForest_res)
 
-print('svm')</code></pre>
-<pre><code>[1] &quot;svm&quot;</code></pre>
-<pre class="r"><code>svm_res = do_it_10_times(cross_validate, hepatitis_data, svm, &quot;Class&quot;, 10, p=F)
+svm_res = do_it_10_times(cross_validate, hepatitis_data, svm, &quot;Class&quot;, 10, p=F)
 hepatitis_data_matrix &lt;- hepatitis_data_matrix %&gt;% cbind(svm_res)
 
-print('naive')</code></pre>
-<pre><code>[1] &quot;naive&quot;</code></pre>
-<pre class="r"><code>naiveBayes_res = do_it_10_times(cross_validate, hepatitis_data, naiveBayes, &quot;Class&quot;, 10, p=F)
+naiveBayes_res = do_it_10_times(cross_validate, hepatitis_data, naiveBayes, &quot;Class&quot;, 10, p=F)
 hepatitis_data_matrix &lt;- hepatitis_data_matrix %&gt;% cbind(naiveBayes_res)
 
-print('bagging')</code></pre>
-<pre><code>[1] &quot;bagging&quot;</code></pre>
-<pre class="r"><code>#bagging_res = do_it_10_times(cross_validate, hepatitis_data, ipred::bagging, &quot;Class&quot;, 10, p=T, type='class')
-#hepatitis_data_matrix &lt;- hepatitis_data_matrix %&gt;% cbind(bagging_res)
+bagging_res = do_it_10_times(cross_validate, hepatitis_data, ipred::bagging, &quot;Class&quot;, 10, p=F, type='class')
+hepatitis_data_matrix &lt;- hepatitis_data_matrix %&gt;% cbind(bagging_res)
+
+#hepatitis_data_scaled &lt;- prepare_for_NN(hepatitis_data, 'Class')
+#nn_res &lt;- cross_validate_NN(data=hepatitis_data_scaled, class= &quot;Class&quot;, folds=10,  print=F)
+#hepatitis_data_matrix &lt;- hepatitis_data_matrix %&gt;% cbind(nn_res)
 
 hepatitis_data_matrix &lt;- hepatitis_data_matrix[,-1]
-colnames(hepatitis_data_matrix) &lt;- c(&quot;J48&quot;, &quot;randomForest&quot;, &quot;svm&quot;, &quot;naiveBayes&quot;)</code></pre>
+colnames(hepatitis_data_matrix) &lt;- c(&quot;J48&quot;, &quot;randomForest&quot;, &quot;svm&quot;, &quot;naiveBayes&quot;, &quot;bagging&quot;)</code></pre>
 <hr />
 </div>
 <div id="spec-data" class="section level3">
@@ -394,83 +395,61 @@ colnames(spec_data) = c(&quot;class&quot;, &quot;F1&quot;, &quot;F2&quot;, &quot
 spec_data2 &lt;- read.csv(&quot;data/SPECT.train&quot;, header=F)
 colnames(spec_data2) = c(&quot;class&quot;, &quot;F1&quot;, &quot;F2&quot;, &quot;F3&quot;, &quot;F4&quot;, &quot;F5&quot;, &quot;F6&quot;, &quot;F7&quot;, &quot;F8&quot;, &quot;F9&quot;, &quot;F10&quot;, &quot;F11&quot;, &quot;F12&quot;, &quot;F13&quot;, &quot;F14&quot;, &quot;F15&quot;, &quot;F16&quot;, &quot;F17&quot;, &quot;F18&quot;, &quot;F19&quot;, &quot;F20&quot;, &quot;F21&quot;, &quot;F22&quot;)
 spec_data &lt;- rbind(spec_data, spec_data2) 
-spec_data &lt;- spec_data[sample(nrow(spec_data)), ]</code></pre>
+spec_data &lt;- spec_data[sample(nrow(spec_data)), ]
+spec_data[spec_data == '?'] = NA</code></pre>
 <pre class="r"><code>spec_data_matrix &lt;- data.frame(1:4)
 rownames(spec_data_matrix) &lt;- c(&quot;Accuracy&quot;, &quot;Precision&quot;, &quot;Recall&quot;, &quot;F_Score&quot;)
 
-print('j48')</code></pre>
-<pre><code>[1] &quot;j48&quot;</code></pre>
-<pre class="r"><code>J48_res = do_it_10_times(cross_validate, spec_data, J48, &quot;class&quot;, 10, p=F)
+J48_res = do_it_10_times(cross_validate, spec_data, J48, &quot;class&quot;, 10, p=F)
 spec_data_matrix &lt;- spec_data_matrix %&gt;% cbind(J48_res)
 
-print('randomFores')</code></pre>
-<pre><code>[1] &quot;randomFores&quot;</code></pre>
-<pre class="r"><code>randomForest_res = do_it_10_times(cross_validate, spec_data, randomForest, &quot;class&quot;, 10, p=F)
+randomForest_res = do_it_10_times(cross_validate, spec_data, randomForest, &quot;class&quot;, 10, p=F)
 spec_data_matrix &lt;- spec_data_matrix %&gt;% cbind(randomForest_res)
 
-print('svm')</code></pre>
-<pre><code>[1] &quot;svm&quot;</code></pre>
-<pre class="r"><code>svm_res = do_it_10_times(cross_validate, spec_data, svm, &quot;class&quot;, 10, p=F)
+svm_res = do_it_10_times(cross_validate, spec_data, svm, &quot;class&quot;, 10, p=F)
 spec_data_matrix &lt;- spec_data_matrix %&gt;% cbind(svm_res)
 
-print('naive')</code></pre>
-<pre><code>[1] &quot;naive&quot;</code></pre>
-<pre class="r"><code>naiveBayes_res = do_it_10_times(cross_validate, spec_data, naiveBayes, &quot;class&quot;, 10, p=F)
+naiveBayes_res = do_it_10_times(cross_validate, spec_data, naiveBayes, &quot;class&quot;, 10, p=F)
 spec_data_matrix &lt;- spec_data_matrix %&gt;% cbind(naiveBayes_res)
 
-print('bagging')</code></pre>
-<pre><code>[1] &quot;bagging&quot;</code></pre>
-<pre class="r"><code>#bagging_res = do_it_10_times(cross_validate, spec_data, ipred::bagging, &quot;Class&quot;, 10, p=T, type='class')
-#spec_data_matrix &lt;- spec_data_matrix %&gt;% cbind(bagging_res)
+bagging_res = do_it_10_times(cross_validate, spec_data, ipred::bagging, &quot;class&quot;, 10, p=F, type='class')
+spec_data_matrix &lt;- spec_data_matrix %&gt;% cbind(bagging_res)
 
 spec_data_matrix &lt;- spec_data_matrix[,-1]
-colnames(spec_data_matrix) &lt;- c(&quot;J48&quot;, &quot;randomForest&quot;, &quot;svm&quot;, &quot;naiveBayes&quot;)</code></pre>
+colnames(spec_data_matrix) &lt;- c(&quot;J48&quot;, &quot;randomForest&quot;, &quot;svm&quot;, &quot;naiveBayes&quot;, &quot;bagging&quot;)</code></pre>
 </div>
 <div id="sonar-data" class="section level3">
 <h3>Sonar Data</h3>
-<pre class="r"><code>sonar_data &lt;- read.csv(&quot;data/SPECT.test&quot;, header=F)
-colnames(sonar_data) = c(&quot;class&quot;, &quot;F1&quot;, &quot;F2&quot;, &quot;F3&quot;, &quot;F4&quot;, &quot;F5&quot;, &quot;F6&quot;, &quot;F7&quot;, &quot;F8&quot;, &quot;F9&quot;, &quot;F10&quot;, &quot;F11&quot;, &quot;F12&quot;, &quot;F13&quot;, &quot;F14&quot;, &quot;F15&quot;, &quot;F16&quot;, &quot;F17&quot;, &quot;F18&quot;, &quot;F19&quot;, &quot;F20&quot;, &quot;F21&quot;, &quot;F22&quot;)
-sonar_data2 &lt;- read.csv(&quot;data/SPECT.train&quot;, header=F)
-colnames(sonar_data2) = c(&quot;class&quot;, &quot;F1&quot;, &quot;F2&quot;, &quot;F3&quot;, &quot;F4&quot;, &quot;F5&quot;, &quot;F6&quot;, &quot;F7&quot;, &quot;F8&quot;, &quot;F9&quot;, &quot;F10&quot;, &quot;F11&quot;, &quot;F12&quot;, &quot;F13&quot;, &quot;F14&quot;, &quot;F15&quot;, &quot;F16&quot;, &quot;F17&quot;, &quot;F18&quot;, &quot;F19&quot;, &quot;F20&quot;, &quot;F21&quot;, &quot;F22&quot;)
-sonar_data &lt;- rbind(sonar_data, sonar_data2) 
-sonar_data &lt;- sonar_data[sample(nrow(sonar_data)), ]</code></pre>
+<pre class="r"><code>sonar_data &lt;- read.csv(&quot;data/sonar.all-data&quot;, header=T)
+sonar_data &lt;- sonar_data[sample(nrow(sonar_data)), ]
+#sonar_data[sonar_data == '?'] = NA</code></pre>
 <pre class="r"><code>sonar_data_matrix &lt;- data.frame(1:4)
 rownames(sonar_data_matrix) &lt;- c(&quot;Accuracy&quot;, &quot;Precision&quot;, &quot;Recall&quot;, &quot;F_Score&quot;)
 
-print('j48')</code></pre>
-<pre><code>[1] &quot;j48&quot;</code></pre>
-<pre class="r"><code>J48_res = do_it_10_times(cross_validate, sonar_data, J48, &quot;class&quot;, 10, p=F)
+J48_res = do_it_10_times(cross_validate, sonar_data, J48, &quot;R&quot;, 10, p=F)
 sonar_data_matrix &lt;- sonar_data_matrix %&gt;% cbind(J48_res)
 
-print('randomFores')</code></pre>
-<pre><code>[1] &quot;randomFores&quot;</code></pre>
-<pre class="r"><code>randomForest_res = do_it_10_times(cross_validate, sonar_data, randomForest, &quot;class&quot;, 10, p=F)
+randomForest_res = do_it_10_times(cross_validate, sonar_data, randomForest, &quot;R&quot;, 10, p=F)
 sonar_data_matrix &lt;- sonar_data_matrix %&gt;% cbind(randomForest_res)
 
-print('svm')</code></pre>
-<pre><code>[1] &quot;svm&quot;</code></pre>
-<pre class="r"><code>svm_res = do_it_10_times(cross_validate, sonar_data, svm, &quot;class&quot;, 10, p=F)
+svm_res = do_it_10_times(cross_validate, sonar_data, svm, &quot;R&quot;, 10, p=F)
 sonar_data_matrix &lt;- sonar_data_matrix %&gt;% cbind(svm_res)
 
-print('naive')</code></pre>
-<pre><code>[1] &quot;naive&quot;</code></pre>
-<pre class="r"><code>naiveBayes_res = do_it_10_times(cross_validate, sonar_data, naiveBayes, &quot;class&quot;, 10, p=F)
+naiveBayes_res = do_it_10_times(cross_validate, sonar_data, naiveBayes, &quot;R&quot;, 10, p=F)
 sonar_data_matrix &lt;- sonar_data_matrix %&gt;% cbind(naiveBayes_res)
 
-print('bagging')</code></pre>
-<pre><code>[1] &quot;bagging&quot;</code></pre>
-<pre class="r"><code>#bagging_res = do_it_10_times(cross_validate, sonar_data, ipred::bagging, &quot;Class&quot;, 10, p=T, type='class')
-#sonar_data_matrix &lt;- sonar_data_matrix %&gt;% cbind(bagging_res)
+bagging_res = do_it_10_times(cross_validate, sonar_data, ipred::bagging, &quot;R&quot;, 10, p=F, type='class')
+sonar_data_matrix &lt;- sonar_data_matrix %&gt;% cbind(bagging_res)
 
 sonar_data_matrix &lt;- sonar_data_matrix[,-1]
-colnames(sonar_data_matrix) &lt;- c(&quot;J48&quot;, &quot;randomForest&quot;, &quot;svm&quot;, &quot;naiveBayes&quot;)</code></pre>
+colnames(sonar_data_matrix) &lt;- c(&quot;J48&quot;, &quot;randomForest&quot;, &quot;svm&quot;, &quot;naiveBayes&quot;, &quot;bagging&quot;)</code></pre>
 </div>
 <div id="final-matrices" class="section level3">
 <h3>Final Matrices</h3>
 <pre class="r"><code>list &lt;- list(spec_data_matrix, hepatitis_data_matrix, sonar_data_matrix)
 datasets &lt;- c(&quot;Spect&quot;, &quot;Hepatitis&quot;, &quot;Sonar&quot;)
 metrics &lt;- c(&quot;Accuracy&quot;, &quot;Precision&quot;, &quot;Recall&quot;, &quot;F_Score&quot;)
-algorithm_names &lt;- c(&quot;J48&quot;, &quot;randomForest&quot;, &quot;svm&quot;, &quot;naiveBayes&quot;)
+algorithm_names &lt;- c(&quot;J48&quot;, &quot;randomForest&quot;, &quot;svm&quot;, &quot;naiveBayes&quot;, &quot;bagging&quot;)
 
 final_matrix &lt;- c()
 counter &lt;- 1
@@ -499,31 +478,32 @@ for(met in metrics) {
 <p>We’ll print each metric and it’s corresponding matrix of algorithms against datasets:</p>
 <div id="accuracy" class="section level4">
 <h4>Accuracy</h4>
-<pre><code>                J48 randomForest       svm naiveBayes
-Spect     0.8841493    0.9571865 0.8730696  0.6242004
-Hepatitis 0.8691439    0.2519370 0.7804781  0.8593788
-Sonar     0.8956201    0.9550338 0.8861078  0.6238158</code></pre>
+<pre><code>                J48 randomForest       svm naiveBayes   bagging
+Spect     0.8831075    0.9648473 0.8769507  0.6208949 0.9745469
+Hepatitis 0.8691439    0.2519370 0.7804781  0.8593788 0.0000000
+Sonar     0.9819858    1.0000000 0.9832810  0.7371224 0.9984848</code></pre>
 </div>
 <div id="precision" class="section level4">
 <h4>Precision</h4>
-<pre><code>                J48 randomForest       svm naiveBayes
-Spect     0.9031927    0.9776284 0.8955960  0.9669504
-Hepatitis 0.8973619          NaN 0.7804781  1.0000000
-Sonar     0.9087831    0.9792652 0.9040529  0.9612905</code></pre>
+<pre><code>                J48 randomForest       svm naiveBayes   bagging
+Spect     0.8987838    0.9885988 0.8974315  0.9682674 0.9924838
+Hepatitis 0.8973619          NaN 0.7804781  1.0000000 0.0000000
+Sonar     0.9880411    1.0000000 0.9624813  0.6653674 1.0000000</code></pre>
 </div>
 <div id="recall" class="section level4">
 <h4>Recall</h4>
-<pre><code>                J48 randomForest       svm naiveBayes
-Spect     0.9543788   0.96795685 0.9561394  0.5457835
-Hepatitis 0.9442880   0.05818107 1.0000000  0.8231511
-Sonar     0.9648843   0.96534514 0.9584248  0.5432880</code></pre>
+<pre><code>                J48 randomForest       svm naiveBayes   bagging
+Spect     0.9614684   0.96624355 0.9499682  0.5415018 0.9761242
+Hepatitis 0.9442880   0.05818107 1.0000000  0.8231511 0.0000000
+Sonar     0.9720309   1.00000000 0.9969697  0.8852798 0.9962963</code></pre>
 </div>
 <div id="f_score" class="section level4">
 <h4>F_Score</h4>
-<pre><code>                J48 randomForest       svm naiveBayes
-Spect     0.9269358    0.9722300 0.9226147  0.6904408
-Hepatitis 0.9175208          NaN 0.8698153  0.8977439
-Sonar     0.9345346    0.9715409 0.9290120  0.6904265</code></pre>
+<pre><code>                J48 randomForest       svm naiveBayes   bagging
+Spect     0.9270376    0.9766857 0.9220066  0.6834991 0.9839193
+Hepatitis 0.9175208          NaN 0.8698153  0.8977439 0.0000000
+Sonar     0.9793458    1.0000000 0.9777885  0.7547040 0.9980392</code></pre>
+<p>As we can see the forest and J48 performed quite well on most data sets and it’s no surprise since they both depend on a decision tree, which is a good classification tool. However on the Hepatitis data set, the random forest algorithm perforemd very poorly. I guess the reason was that the data itself isn’t applicable to a decision tree. Since we needed to classify who would live or die based on some features like age, liver size, some anzymes and vitamines levels. So I imagine the tree had problems while branching becuase it couldn’t gain a lot of information per branch and the entropy remained almost consistently high among all levels of the tree. That’s why adding more trees using the forest didn’t enhance the results, cuz all trees were still confused and producing conflicting decisions. However, the J48 which useds a single decision tree performed while, but that could be</p>
 <hr />
 </div>
 </div>
@@ -552,7 +532,7 @@ for(met in metrics) {
     counter &lt;- counter + 1
 }
 
-positions_scores &lt;- c(9, 7, 5, 3)
+positions_scores &lt;- c(11, 9, 7, 5, 3)
 final_tournamet &lt;- c()
 counter1 &lt;- 1
 for(alg in algorithm_names) {
@@ -570,29 +550,30 @@ for(met in metrics) {
 <p>The numbers associated with each algorithm, indicate how many battles the algorithm has won fighting all other algorithm under the same metric</p>
 <div id="accuracy-1" class="section level4">
 <h4>Accuracy</h4>
-<pre><code>         J48 randomForest          svm   naiveBayes 
-           7            6            3            2 </code></pre>
+<pre><code>randomForest          J48      bagging          svm   naiveBayes 
+           8            7            7            5            3 </code></pre>
 </div>
 <div id="precision-1" class="section level4">
 <h4>Precision</h4>
-<pre><code>randomForest   naiveBayes          J48          svm 
-           6            6            3            0 </code></pre>
+<pre><code>     bagging randomForest          J48   naiveBayes          svm 
+           7            6            5            5            2 </code></pre>
 </div>
 <div id="recall-1" class="section level4">
 <h4>Recall</h4>
-<pre><code>randomForest          svm          J48   naiveBayes 
-           6            6            5            1 </code></pre>
+<pre><code>randomForest          svm          J48      bagging   naiveBayes 
+           8            8            6            6            2 </code></pre>
 </div>
 <div id="f_score-1" class="section level4">
 <h4>F_Score</h4>
-<pre><code>         J48 randomForest          svm   naiveBayes 
-           6            6            2            1 </code></pre>
+<pre><code>         J48 randomForest      bagging          svm   naiveBayes 
+           7            7            7            3            2 </code></pre>
 <hr />
 </div>
 <div id="and-for-the-final-results" class="section level4">
 <h4>And for the FINAL RESULTS !!</h4>
-<pre><code>randomForest          J48          svm   naiveBayes 
-          32           28           20           16 </code></pre>
+<pre><code>randomForest          J48      bagging          svm   naiveBayes 
+          40           34           30           22           14 </code></pre>
+<p>The random-forest performed so well on different data sets, because of underlying decision tree which is a powerful classification tool as long as the data is not huge. Once the data is huge enough or there are lots of features, building a single tree would be expensive let alone build a forest of them. However, since our data sets were hundreds big, the complexity wasn’t an issue and the algorithm out performed the rest.</p>
 </div>
 </div>
 </div>
